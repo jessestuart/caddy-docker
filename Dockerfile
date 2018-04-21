@@ -1,6 +1,6 @@
-#
+# =======
 # Builder
-#
+# =======
 FROM abiosoft/caddy:builder as builder
 
 ARG version="0.11.0"
@@ -11,11 +11,11 @@ RUN go get -v github.com/abiosoft/parent
 
 RUN VERSION=${version} PLUGINS=${plugins} /bin/sh /usr/bin/builder.sh
 
-#
+# ===========
 # Final stage
-#
+# ===========
 FROM alpine:3.7
-LABEL maintainer "Abiola Ibrahim <abiola89@gmail.com>"
+LABEL maintainer="Jesse Stuart <hi@jessestuart.com>"
 
 ARG version="0.11.0"
 LABEL caddy_version="$version"
@@ -44,4 +44,3 @@ COPY --from=builder /go/bin/parent /bin/parent
 
 ENTRYPOINT ["/bin/parent", "caddy"]
 CMD ["--conf", "/etc/Caddyfile", "--log", "stdout", "--agree=$ACME_AGREE"]
-
