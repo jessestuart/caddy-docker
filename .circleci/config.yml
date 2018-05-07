@@ -1,17 +1,26 @@
 ---
 version: 2
 
+build_jobs: &build_jobs
+  jobs:
+    - build-amd64
+    - build-arm64
+    - build-armhf
+    - push-manifest:
+        requires:
+          - build-amd64
+          - build-arm64
+          - build-armhf
+
 # ====================
 # WORKFLOW DECLARATION
 # ====================
 workflows:
   version: 2
   commit:
-    jobs:
-      - build
+    <<: *build_jobs
   nightly:
-    jobs:
-      - build
+    <<: *build_jobs
     triggers:
       - schedule:
           cron: "0 0 * * *"
@@ -20,37 +29,114 @@ workflows:
               only:
                 - master
 
+shared: &shared
+  name: Build and push Docker image.
+  docker:
+    - image: docker:18-git
+  environment:
+    - IMAGE_ID: "jessestuart/caddy-cloudflare"
+    - GITHUB_REPO: "mholt/caddy"
+  steps:
+    - checkout
+
+    - setup_remote_docker:
+        docker_layer_caching: true
+
+    - run: apk add --no-cache curl jq
+
+    - run:
+        name: Build Docker image.
+        command: |
+          export IMAGE_ID="jessestuart/caddy-cloudflare"
+          export GITHUB_REPO="mholt/caddy"
+          export VERSION=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | jq -r ".tag_name")
+
+          docker build -t "${IMAGE_ID}:${VERSION}-${GOARCH}" .
+
+    - run:
+        name: Push image to Docker Hub.
+        command: |
+          export IMAGE_ID="jessestuart/caddy-cloudflare"
+          export GITHUB_REPO="mholt/caddy"
+          echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USER --password-stdin
+          export VERSION=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | jq -r ".tag_name")
+          docker push "${IMAGE_ID}:${VERSION}-${GOARCH}"
+
 # ================
 # JOB DECLARATIONS
 # ================
 jobs:
-
-  build:
-    name: Build and push Docker image.
+  build-amd64:
+    <<: *shared
     environment:
-      - IMAGE_TAG: "v0.10.14"
-      - IMAGE_ID: "jessestuart/caddy-cloudflare"
+      GOARCH: amd64
+      QEMU_ARCH: amd64
+      QEMU_VERSION: v2.11.0
+      TAG: amd64
+      TARGET: amd64
+  build-arm64:
+    <<: *shared
+    environment:
+      GOARCH: arm64
+      QEMU_ARCH: aarch64
+      QEMU_VERSION: v2.11.0
+      TAG: arm64
+      TARGET: arm64v8
+  build-armhf:
+    <<: *shared
+    environment:
+      GOARCH: arm
+      QEMU_ARCH: arm
+      QEMU_VERSION: v2.11.0
+      TAG: arm
+      TARGET: arm32v6
+
+  # ===================================
+  # ===================================
+  # ===================================
+
+  push-manifest:
     docker:
       - image: docker:18-git
+    environment:
+      GITHUB_REPO: mholt/caddy
+      IMAGE: caddy-cloudflare
+      REGISTRY: jessestuart
     steps:
       - checkout
-
-      - setup_remote_docker:
-          docker_layer_caching: true
+      - setup_remote_docker
+      - run:
+          name: Determine repo version.
+          command: |
+            apk update && apk add curl jq
+            curl -s https://api.github.com/repos/${GITHUB_REPO}/releases/latest | jq -r ".tag_name" > ~/VERSION
 
       - run:
-          name: Build Docker image.
+          name: Install manifest-tool.
           command: |
-            docker build -t "${IMAGE_ID}:${IMAGE_TAG}" .
+            export VERSION=$(cat ~/VERSION)
+            echo "Downloading manifest-tool."
+            wget https://github.com/estesp/manifest-tool/releases/download/v0.7.0/manifest-tool-linux-amd64
+            mv manifest-tool-linux-amd64 /usr/bin/manifest-tool
+            chmod +x /usr/bin/manifest-tool
+            manifest-tool --version
 
       - run:
-          name: Authenticate with Docker Hub.
+          name: Push Docker manifest.
           command: |
-            echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USER --password-stdin
-
+            export VERSION=$(cat ~/VERSION)
+            echo "Pushing manifest "$REGISTRY/$IMAGE":latest"
+            echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USER --password-stdin;
+            manifest-tool push from-args \
+              --platforms linux/arm,linux/arm64,linux/amd64 \
+              --template "$REGISTRY/$IMAGE:$VERSION-ARCH" \
+              --target "$REGISTRY/$IMAGE:latest"
+            manifest-tool push from-args \
+              --platforms linux/arm,linux/arm64,linux/amd64 \
+              --template "$REGISTRY/$IMAGE:$VERSION-ARCH" \
+              --target "$REGISTRY/$IMAGE:$VERSION"
       - run:
-          name: Push image to Docker Hub.
+          name: Verify manifest was persisted remotely.
           command: |
-            docker push                 "${IMAGE_ID}:${IMAGE_TAG}"
-            docker tag                  "${IMAGE_ID}" "${IMAGE_ID}:circle-${CIRCLE_BUILD_NUM}"
-            docker push                 "${IMAGE_ID}:circle-${CIRCLE_BUILD_NUM}"
+            export VERSION=$(cat ~/VERSION)
+            manifest-tool inspect "$REGISTRY/$IMAGE:$VERSION"

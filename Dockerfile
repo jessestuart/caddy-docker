@@ -21,7 +21,7 @@ ARG version="0.11.0"
 LABEL caddy_version="$version"
 
 # Let's Encrypt Agreement
-ENV ACME_AGREE="false"
+ENV ACME_AGREE="true"
 
 RUN apk add --no-cache openssh-client git
 
@@ -29,15 +29,13 @@ RUN apk add --no-cache openssh-client git
 COPY --from=builder /install/caddy /usr/bin/caddy
 
 # validate install
-RUN /usr/bin/caddy -version
-RUN /usr/bin/caddy -plugins
+RUN caddy -version && caddy -plugins
 
 EXPOSE 80 443 2015
 VOLUME /root/.caddy /srv
 WORKDIR /srv
 
 COPY Caddyfile /etc/Caddyfile
-COPY index.html /srv/index.html
 
 # install process wrapper
 COPY --from=builder /go/bin/parent /bin/parent
