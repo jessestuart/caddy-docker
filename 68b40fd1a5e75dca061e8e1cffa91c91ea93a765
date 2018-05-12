@@ -228,3 +228,7 @@ Dockerfile:360,1526119200:240,1526122800:120,m
 [ver:1,total:900]
 Dockerfile:800,1526119200:800,m
 .circleci/config.yml:100,1526119200:100,r
+
+[ver:1,total:300]
+Dockerfile:180,1526122800:180,r
+.circleci/config.yml:120,1526122800:120,m
