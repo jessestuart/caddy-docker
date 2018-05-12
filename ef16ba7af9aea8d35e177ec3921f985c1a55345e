@@ -1,3 +1,10 @@
 [ver:1,total:420]
 .git/rebase-merge/git-rebase-todo:300,1526137200:300,d
 Dockerfile:120,1526137200:120,m
+
+[ver:1,total:540]
+Dockerfile:210,1526122800:210,m
+.git/rebase-merge/git-rebase-todo:160,1526122800:160,d
+.circleci/config.yml:120,1526122800:120,m
+Dockerfile-no-stats:30,1526122800:30,r
+.git/PULLREQ_EDITMSG:20,1526122800:20,d
