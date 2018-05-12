@@ -2,3 +2,8 @@
 Dockerfile:150,1526126400:150,m
 builder/builder.sh:120,1526126400:120,r
 .circleci/config.yml:30,1526126400:30,r
+
+[ver:1,total:900]
+Dockerfile:550,1526122800:360,1526126400:190,m
+.circleci/config.yml:210,1526126400:210,r
+BUILDER.md:140,1526126400:140,r
