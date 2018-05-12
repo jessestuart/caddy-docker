@@ -6,15 +6,27 @@ ARG version
 # =======
 FROM abiosoft/caddy:builder as builder
 
+COPY GOARCH /GOARCH
+
+COPY qemu-* /usr/bin/
+
 ARG plugins="git,filemanager,cors,realip,expires,cache,cloudflare"
 
 ARG goarch
+ENV GOARCH $goarch
+ENV GOROOT /usr/local/go
+ENV GOPATH /go
+ENV PATH "$GOROOT/bin:$GOPATH/bin:$GOPATH/linux_$GOARCH/bin:$PATH"
+
 # process wrapper
-RUN GOARCH=$goarch go get -v github.com/abiosoft/parent && \
+RUN go get -v github.com/abiosoft/parent && \
       (cp /go/bin/**/parent /bin/parent || \
        cp -f /go/bin/parent /bin/parent) &>/dev/null
 
-RUN VERSION=${version} PLUGINS=${plugins} /bin/sh /usr/bin/builder.sh
+RUN rm -rf /usr/bin/builder.sh
+COPY builder/builder.sh /usr/bin/builder.sh
+
+RUN VERSION=${version} PLUGINS=${plugins} GOARCH=${goarch} /bin/sh /usr/bin/builder.sh
 
 # ===========
 # Final stage
@@ -25,12 +37,8 @@ LABEL caddy_version="$version"
 
 ARG arch
 ENV ARCH=$arch
-# RUN export arch=$ARCH && echo "ARCH: $arch" && apk add --no-cache curl && \
-  # curl -sL "https://github.com/multiarch/qemu-user-static/releases/download/v2.11.0/qemu-$arch-static.tar.gz" | tar xz && \
-  # (test -e qemu-$arch-static && cp qemu-$arch-static /usr/bin)
-COPY qemu-$ARCH-static* /usr/bin/
 
-# COPY --from=builder /usr/bin/qemu-* /usr/bin/
+COPY qemu-* /usr/bin/
 
 ENV GOPATH /go
 ENV PATH $PATH:$GOPATH/bin

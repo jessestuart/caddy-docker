@@ -56,6 +56,7 @@ shared: &shared
           fi
 
           # Replace the repo's Dockerfile with our own.
+          echo "$GOARCH" > ./GOARCH
           docker build \
             -t "${IMAGE_ID}:${VERSION}-${GOARCH}" \
             --build-arg version=$VERSION \
