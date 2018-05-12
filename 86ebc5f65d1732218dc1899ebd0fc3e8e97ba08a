@@ -1,0 +1,4 @@
+[ver:1,total:300]
+Dockerfile:150,1526126400:150,m
+builder/builder.sh:120,1526126400:120,r
+.circleci/config.yml:30,1526126400:30,r
