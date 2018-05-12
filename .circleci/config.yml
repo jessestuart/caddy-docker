@@ -33,9 +33,6 @@ shared: &shared
   name: Build and push Docker image.
   docker:
     - image: docker:18-git
-  environment:
-    - IMAGE_ID: "jessestuart/caddy-cloudflare"
-    - GITHUB_REPO: "mholt/caddy"
   steps:
     - checkout
 
@@ -51,7 +48,21 @@ shared: &shared
           export GITHUB_REPO="mholt/caddy"
           export VERSION=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | jq -r ".tag_name")
 
-          docker build -t "${IMAGE_ID}:${VERSION}-${GOARCH}" .
+          if [ $GOARCH == 'amd64' ]; then
+            touch qemu-amd64-static
+          else
+            curl -sL "https://github.com/multiarch/qemu-user-static/releases/download/${QEMU_VERSION}/qemu-${QEMU_ARCH}-static.tar.gz" | tar xz
+            docker run --rm --privileged multiarch/qemu-user-static:register
+          fi
+
+          # Replace the repo's Dockerfile with our own.
+          echo "$GOARCH" > ./GOARCH
+          docker build \
+            -t "${IMAGE_ID}:${VERSION}-${GOARCH}" \
+            --build-arg version=$VERSION \
+            --build-arg target=$TARGET \
+            --build-arg arch=$QEMU_ARCH \
+            --build-arg goarch=$GOARCH .
 
     - run:
         name: Push image to Docker Hub.
@@ -127,14 +138,19 @@ jobs:
             export VERSION=$(cat ~/VERSION)
             echo "Pushing manifest "$REGISTRY/$IMAGE":latest"
             echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USER --password-stdin;
-            manifest-tool push from-args \
-              --platforms linux/arm,linux/arm64,linux/amd64 \
-              --template "$REGISTRY/$IMAGE:$VERSION-ARCH" \
-              --target "$REGISTRY/$IMAGE:latest"
+
+            if [ "${CIRCLE_BRANCH}" == 'master' ]; then
+              manifest-tool push from-args \
+                --platforms linux/arm,linux/arm64,linux/amd64 \
+                --template "$REGISTRY/$IMAGE:$VERSION-ARCH" \
+                --target "$REGISTRY/$IMAGE:latest"
+            fi
+
             manifest-tool push from-args \
               --platforms linux/arm,linux/arm64,linux/amd64 \
               --template "$REGISTRY/$IMAGE:$VERSION-ARCH" \
               --target "$REGISTRY/$IMAGE:$VERSION"
+
       - run:
           name: Verify manifest was persisted remotely.
           command: |

@@ -1,24 +1,47 @@
+ARG target
+
 # =======
 # Builder
 # =======
 FROM abiosoft/caddy:builder as builder
 
-ARG version="0.11.0"
-ARG plugins="git,filemanager,cors,realip,expires,cache"
+COPY GOARCH /GOARCH
+
+COPY qemu-* /usr/bin/
+
+ARG plugins="git,filemanager,cors,realip,expires,cache,cloudflare"
+
+ARG goarch
+ENV GOARCH $goarch
+ENV GOROOT /usr/local/go
+ENV GOPATH /go
+ENV PATH "$GOROOT/bin:$GOPATH/bin:$GOPATH/linux_$GOARCH/bin:$PATH"
 
 # process wrapper
-RUN go get -v github.com/abiosoft/parent
+RUN go get -v github.com/abiosoft/parent && \
+      (cp /go/bin/**/parent /bin/parent || \
+       cp -f /go/bin/parent /bin/parent) &>/dev/null
 
-RUN VERSION=${version} PLUGINS=${plugins} /bin/sh /usr/bin/builder.sh
+RUN rm -rf /usr/bin/builder.sh
+COPY builder/builder.sh /usr/bin/builder.sh
+
+ARG version
+RUN VERSION=${version} PLUGINS=${plugins} GOARCH=${goarch} /bin/sh /usr/bin/builder.sh
 
 # ===========
 # Final stage
 # ===========
-FROM alpine:3.7
+FROM $target/alpine
 LABEL maintainer="Jesse Stuart <hi@jessestuart.com>"
-
-ARG version="0.11.0"
 LABEL caddy_version="$version"
+
+ARG arch
+ENV ARCH=$arch
+
+COPY qemu-* /usr/bin/
+
+ENV GOPATH /go
+ENV PATH $PATH:$GOPATH/bin
 
 # Let's Encrypt Agreement
 ENV ACME_AGREE="true"
@@ -38,7 +61,7 @@ WORKDIR /srv
 COPY Caddyfile /etc/Caddyfile
 
 # install process wrapper
-COPY --from=builder /go/bin/parent /bin/parent
+COPY --from=builder /bin/parent /bin/parent
 
 ENTRYPOINT ["/bin/parent", "caddy"]
 CMD ["--conf", "/etc/Caddyfile", "--log", "stdout", "--agree=$ACME_AGREE"]
