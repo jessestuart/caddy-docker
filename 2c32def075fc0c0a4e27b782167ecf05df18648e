@@ -1,0 +1,6 @@
+[ver:1,total:1800]
+.circleci/config.yml:788,1526180400:788,m
+README.md:450,1526151600:270,1526180400:180,r
+.circleci/push-manifest.sh:352,1526180400:352,r
+Dockerfile:180,1526137200:180,r
+Caddyfile:30,1526151600:30,r
