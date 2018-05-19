@@ -9,8 +9,12 @@ git clone https://github.com/mholt/caddy -b "v$VERSION" /go/src/github.com/mholt
     && git checkout -b "v$VERSION"
 
 # plugin helper
-GOOS=linux GOARCH=amd64 go get -v github.com/abiosoft/caddyplug/caddyplug
-alias caddyplug='GOOS=linux GOARCH=amd64 caddyplug'
+GOOS=linux GOARCH=$GOARCH go get -v github.com/abiosoft/caddyplug/caddyplug
+if [ $GOARCH == 'amd64' ]; then
+  alias caddyplug="GOOS=linux GOARCH=$GOARCH $GOPATH/bin/caddyplug"
+else
+  alias caddyplug="GOOS=linux GOARCH=$GOARCH $GOPATH/bin/linux_$GOARCH/caddyplug"
+fi
 
 # telemetry
 run_file="/go/src/github.com/mholt/caddy/caddy/caddymain/run.go"
@@ -37,14 +41,16 @@ for plugin in $(echo $PLUGINS | tr "," " "); do \
     go get -v $(caddyplug package $plugin); \
     printf "package caddyhttp\nimport _ \"$(caddyplug package $plugin)\"" > \
         /go/src/github.com/mholt/caddy/caddyhttp/$plugin.go ; \
-    done
+  GOOS=linux GOARCH=$GOARCH go get -v $(caddyplug package $plugin); \
+  printf "package caddyhttp\nimport _ \"$(caddyplug package $plugin)\"" > \
+      /go/src/github.com/mholt/caddy/caddyhttp/$plugin.go ; \
+done
 
 # builder dependency
 git clone https://github.com/caddyserver/builds /go/src/github.com/caddyserver/builds
 
 # build
 cd /go/src/github.com/mholt/caddy/caddy \
-    && GOOS=linux GOARCH=amd64 go run build.go -goos=$GOOS -goarch=$GOARCH -goarm=$GOARM \
-    && mkdir -p /install \
-    && mv caddy /install
-
+  && GOOS=linux GOARCH=$GOARCH go run build.go -goos=$GOOS -goarch=$GOARCH -goarm=$GOARM \
+  && mkdir -p /install \
+  && mv caddy /install
